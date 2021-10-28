@@ -19,14 +19,6 @@ def main():
     ) = _get_datasets()
 
 
-def normalize(dataset):
-    return (dataset / 127.5) - 1
-
-
-def process_dataset(dataset):
-    return normalize(dataset)
-
-
 def load_dataset(path):
     images = list()
     for filename in listdir(path):
