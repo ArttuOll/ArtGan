@@ -1,13 +1,10 @@
 from os import listdir
 import tensorflow as tf
-from tensorflow import keras
+from keras.preprocessing.image import load_img
 import numpy as np
 import math
 
 from tensorflow.python.data.ops.dataset_ops import Dataset
-
-IMAGE_HIGHT = 64
-IMAGE_WIDTH = 64
 
 
 def main():
@@ -18,14 +15,28 @@ def main():
         cityscape_dataset_validation,
     ) = _get_datasets()
 
+    # Preprocess training data
+    art_dataset_training.map(preprocess_train_image).cache().shuffle(
+        232
+    ).batch(1)
+    cityscape_dataset_training.map(preprocess_train_image).cache().shuffle(
+        232
+    ).batch(1)
+
+    # Preprocess validation data
+    art_dataset_validation.map(normalize_pixel_values).cache().shuffle(
+        232
+    ).batch(1)
+    cityscape_dataset_validation.map(normalize_pixel_values).cache().shuffle(
+        232
+    ).batch(1)
+
 
 def load_dataset(path):
     images = list()
     for filename in listdir(path):
 
-        image = tf.keras.preprocessing.image.load_img(
-            path + "/" + filename, target_size=(IMAGE_HIGHT, IMAGE_WIDTH)
-        )
+        image = load_img(path + "/" + filename)
         array = tf.keras.preprocessing.image.img_to_array(image)
         images.append(array)
     return np.stack(images)
@@ -41,7 +52,7 @@ def _validation_split(dataset):
 
 
 def _convert_to_dataset_object(dataset):
-    return Dataset.from_sparse_tensor_slices(dataset)
+    return Dataset.from_tensor_slices(dataset)
 
 
 def _get_datasets():
@@ -72,6 +83,18 @@ def _get_datasets():
         cityscape_dataset_training,
         cityscape_dataset_validation,
     )
+
+
+def normalize_pixel_values(img):
+    img = tf.cast(img, dtype=tf.float32)
+    # Map values in the range [-1, 1]
+    return (img / 127.5) - 1.0
+
+
+def preprocess_train_image(img):
+    img = tf.image.random_flip_left_right(img)
+    img = normalize_pixel_values(img)
+    return img
 
 
 if __name__ == "__main__":
