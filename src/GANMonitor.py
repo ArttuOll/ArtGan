@@ -9,9 +9,9 @@ class GANMonitor(keras.callbacks.Callback):
     def __init__(self, num_img=4):
         self.num_img = num_img
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch, test_dataset, logs=None):
         _, ax = plt.subplots(4, 2, figsize=(12, 12))
-        for i, img in enumerate(test_horses.take(self.num_img)):
+        for i, img in enumerate(test_dataset.take(self.num_img)):
             prediction = self.model.gen_G(img)[0].numpy()
             prediction = (prediction * 127.5 + 127.5).astype(np.uint8)
             img = (img[0] * 127.5 + 127.5).numpy().astype(np.uint8)
@@ -29,3 +29,4 @@ class GANMonitor(keras.callbacks.Callback):
             )
         plt.show()
         plt.close()
+

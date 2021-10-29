@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
+
 class ReflectionPadding2D(layers.Layer):
     def __init__(self, padding=(1, 1), **kwargs):
         self.padding = tuple(padding)

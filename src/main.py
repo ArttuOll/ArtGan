@@ -3,12 +3,21 @@ import tensorflow as tf
 from keras.preprocessing.image import load_img
 import numpy as np
 import math
-import ReflectionPadding2D, CycleGan, GANMonitor
+from GANMonitor import GANMonitor
+from CycleGan import CycleGan
+from ReflectionPadding2D import ReflectionPadding2D
 from tensorflow.keras import layers
 from tensorflow import keras
 import tensorflow_addons as tfa
 
 from tensorflow.python.data.ops.dataset_ops import Dataset
+
+# Weights initializer for the layers.
+kernel_init = keras.initializers.RandomNormal(mean=0.0, stddev=0.02)
+# Gamma initializer for instance normalization.
+gamma_init = keras.initializers.RandomNormal(mean=0.0, stddev=0.02)
+# Size of the random crops to be used during training.
+input_img_size = (256, 256, 3)
 
 
 def main():
@@ -20,20 +29,47 @@ def main():
     ) = _get_datasets()
 
     # Preprocess training data
-    art_dataset_training.map(preprocess_train_image).cache().shuffle(
+    art_dataset_training = art_dataset_training.map(preprocess_train_image).cache().shuffle(
         232
     ).batch(1)
-    cityscape_dataset_training.map(preprocess_train_image).cache().shuffle(
+    cityscape_dataset_training = cityscape_dataset_training.map(preprocess_train_image).cache().shuffle(
         232
     ).batch(1)
 
     # Preprocess validation data
-    art_dataset_validation.map(normalize_pixel_values).cache().shuffle(
+    art_dataset_training = art_dataset_validation.map(normalize_pixel_values).cache().shuffle(
         232
     ).batch(1)
-    cityscape_dataset_validation.map(normalize_pixel_values).cache().shuffle(
+    cityscape_dataset_training = cityscape_dataset_validation.map(normalize_pixel_values).cache().shuffle(
         232
     ).batch(1)
+
+    # Get the generators
+    gen_G = get_resnet_generator(name="generator_G")
+    gen_F = get_resnet_generator(name="generator_F")
+
+    # Get the discriminators
+    disc_X = get_discriminator(name="discriminator_X")
+    disc_Y = get_discriminator(name="discriminator_Y")
+    model = build_model(gen_G, gen_F, disc_X, disc_Y)
+
+    # Callback for periodically saving generated images
+    plotter = GANMonitor()
+    checkpoint_filepath = (
+        "./model_checkpoints/cyclegan_checkpoints.{epoch:03d}"
+    )
+    model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_filepath
+    )
+
+    # Train the model
+    model.fit(
+        tf.data.Dataset.zip(
+            (art_dataset_training, cityscape_dataset_training)
+        ),
+        epochs=1,
+        callbacks=[plotter, model_checkpoint_callback],
+    )
 
 
 def load_dataset(path):
@@ -101,14 +137,6 @@ def preprocess_train_image(img):
     return img
 
 
-# Weights initializer for the layers.
-kernel_init = keras.initializers.RandomNormal(mean=0.0, stddev=0.02)
-# Gamma initializer for instance normalization.
-gamma_init = keras.initializers.RandomNormal(mean=0.0, stddev=0.02)
-# Size of the random crops to be used during training.
-input_img_size = (256, 256, 3)
-
-
 # Building blocks used in the CycleGan generators and discriminators
 def residual_block(
     x,
@@ -132,7 +160,9 @@ def residual_block(
         padding=padding,
         use_bias=use_bias,
     )(x)
-    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(x)
+    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(
+        x
+    )
     x = activation(x)
 
     x = ReflectionPadding2D()(x)
@@ -144,7 +174,9 @@ def residual_block(
         padding=padding,
         use_bias=use_bias,
     )(x)
-    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(x)
+    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(
+        x
+    )
     x = layers.add([input_tensor, x])
     return x
 
@@ -168,7 +200,9 @@ def downsample(
         padding=padding,
         use_bias=use_bias,
     )(x)
-    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(x)
+    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(
+        x
+    )
     if activation:
         x = activation(x)
     return x
@@ -193,7 +227,9 @@ def upsample(
         kernel_initializer=kernel_initializer,
         use_bias=use_bias,
     )(x)
-    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(x)
+    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(
+        x
+    )
     if activation:
         x = activation(x)
     return x
@@ -210,16 +246,20 @@ def get_resnet_generator(
 ):
     img_input = layers.Input(shape=input_img_size, name=name + "_img_input")
     x = ReflectionPadding2D(padding=(3, 3))(img_input)
-    x = layers.Conv2D(filters, (7, 7), kernel_initializer=kernel_init, use_bias=False)(
+    x = layers.Conv2D(
+        filters, (7, 7), kernel_initializer=kernel_init, use_bias=False
+    )(x)
+    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(
         x
     )
-    x = tfa.layers.InstanceNormalization(gamma_initializer=gamma_initializer)(x)
     x = layers.Activation("relu")(x)
 
     # Downsampling
     for _ in range(num_downsampling_blocks):
         filters *= 2
-        x = downsample(x, filters=filters, activation=layers.Activation("relu"))
+        x = downsample(
+            x, filters=filters, activation=layers.Activation("relu")
+        )
 
     # Residual blocks
     for _ in range(num_residual_blocks):
@@ -274,20 +314,15 @@ def get_discriminator(
             )
 
     x = layers.Conv2D(
-        1, (4, 4), strides=(1, 1), padding="same", kernel_initializer=kernel_initializer
+        1,
+        (4, 4),
+        strides=(1, 1),
+        padding="same",
+        kernel_initializer=kernel_initializer,
     )(x)
 
     model = keras.models.Model(inputs=img_input, outputs=x, name=name)
     return model
-
-
-# Get the generators
-gen_G = get_resnet_generator(name="generator_G")
-gen_F = get_resnet_generator(name="generator_F")
-
-# Get the discriminators
-disc_X = get_discriminator(name="discriminator_X")
-disc_Y = get_discriminator(name="discriminator_Y")
 
 
 # Train the end-to-end model
@@ -308,34 +343,25 @@ def discriminator_loss_fn(real, fake):
     return (real_loss + fake_loss) * 0.5
 
 
-# Create cycle gan model
-cycle_gan_model = CycleGan(
-    generator_G=gen_G, generator_F=gen_F, discriminator_X=disc_X, discriminator_Y=disc_Y
-)
+def build_model(gen_G, gen_F, disc_X, disc_Y):
+    # Create cycle gan model
+    cycle_gan_model = CycleGan(
+        generator_G=gen_G,
+        generator_F=gen_F,
+        discriminator_X=disc_X,
+        discriminator_Y=disc_Y,
+    )
 
-# Compile the model
-cycle_gan_model.compile(
-    gen_G_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
-    gen_F_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
-    disc_X_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
-    disc_Y_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
-    gen_loss_fn=generator_loss_fn,
-    disc_loss_fn=discriminator_loss_fn,
-)
-# Callbacks
-plotter = GANMonitor()
-checkpoint_filepath = "./model_checkpoints/cyclegan_checkpoints.{epoch:03d}"
-model_checkpoint_callback = keras.callbacks.ModelCheckpoint(
-    filepath=checkpoint_filepath
-)
-
-# Here we will train the model for just one epoch as each epoch takes around
-# 7 minutes on a single P100 backed machine.
-cycle_gan_model.fit(
-    tf.data.Dataset.zip((train_horses, train_zebras)), # I don't know what should I put between the parentheses
-    epochs=1,
-    callbacks=[plotter, model_checkpoint_callback],
-)
+    # Compile the model
+    cycle_gan_model.compile(
+        gen_G_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
+        gen_F_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
+        disc_X_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
+        disc_Y_optimizer=keras.optimizers.Adam(learning_rate=2e-4, beta_1=0.5),
+        gen_loss_fn=generator_loss_fn,
+        disc_loss_fn=discriminator_loss_fn,
+    )
+    return cycle_gan_model
 
 
 if __name__ == "__main__":
