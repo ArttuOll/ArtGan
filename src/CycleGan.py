@@ -1,5 +1,6 @@
 from tensorflow import keras
 import tensorflow as tf
+import numpy as np
 
 
 # Build the CycleGAN model
@@ -86,8 +87,10 @@ class CycleGan(keras.Model):
             gen_F_loss = self.generator_loss_fn(disc_fake_x)
 
             # Generator cycle loss
-            cycle_loss_G = self.cycle_loss_fn(real_y, cycled_y) * self.lambda_cycle
-            cycle_loss_F = self.cycle_loss_fn(real_x, cycled_x) * self.lambda_cycle
+            cycle_loss_G = self.cycle_loss_fn(
+                real_y, cycled_y) * self.lambda_cycle
+            cycle_loss_F = self.cycle_loss_fn(
+                real_x, cycled_x) * self.lambda_cycle
 
             # Generator identity loss
             id_loss_G = (
@@ -114,8 +117,10 @@ class CycleGan(keras.Model):
         grads_F = tape.gradient(total_loss_F, self.gen_F.trainable_variables)
 
         # Get the gradients for the discriminators
-        disc_X_grads = tape.gradient(disc_X_loss, self.disc_X.trainable_variables)
-        disc_Y_grads = tape.gradient(disc_Y_loss, self.disc_Y.trainable_variables)
+        disc_X_grads = tape.gradient(
+            disc_X_loss, self.disc_X.trainable_variables)
+        disc_Y_grads = tape.gradient(
+            disc_Y_loss, self.disc_Y.trainable_variables)
 
         # Update the weights of the generators
         self.gen_G_optimizer.apply_gradients(
@@ -139,3 +144,8 @@ class CycleGan(keras.Model):
             "D_X_loss": disc_X_loss,
             "D_Y_loss": disc_Y_loss,
         }
+
+    def call(self, x):
+        prediction = self.gen_G(x)[0].numpy()
+        prediction = (prediction * 127.5 + 127.5).astype(np.uint8)
+        return prediction
