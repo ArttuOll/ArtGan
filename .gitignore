@@ -145,3 +145,4 @@ cython_debug/
 
 training_data.zip
 training_data/
+trained_model/
