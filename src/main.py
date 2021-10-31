@@ -11,6 +11,7 @@ from tensorflow import keras
 import tensorflow_addons as tfa
 from tensorflow.python.data.ops.dataset_ops import Dataset
 import matplotlib.pyplot as plt
+from tensorflow_examples.models.pix2pix import pix2pix
 
 # Weights initializer for the layers.
 kernel_init = keras.initializers.RandomNormal(mean=0.0, stddev=0.02)
@@ -364,12 +365,22 @@ def discriminator_loss_fn(real, fake):
 
 
 def build_model(gen_G, gen_F, disc_X, disc_Y):
-    # Create cycle gan model
+    OUTPUT_CHANNELS = 3
+    generator_g = pix2pix.unet_generator(
+        OUTPUT_CHANNELS, norm_type='instancenorm')
+    generator_f = pix2pix.unet_generator(
+        OUTPUT_CHANNELS, norm_type='instancenorm')
+
+    discriminator_x = pix2pix.discriminator(
+        norm_type='instancenorm', target=False)
+    discriminator_y = pix2pix.discriminator(
+        norm_type='instancenorm', target=False)
+
     cycle_gan_model = CycleGan(
-        generator_G=gen_G,
-        generator_F=gen_F,
-        discriminator_X=disc_X,
-        discriminator_Y=disc_Y,
+        generator_G=generator_g,
+        generator_F=generator_f,
+        discriminator_X=discriminator_x,
+        discriminator_Y=discriminator_y,
     )
 
     # Compile the model
