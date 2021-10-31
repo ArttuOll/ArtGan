@@ -42,7 +42,6 @@ class CycleGan(keras.Model):
         self.identity_loss_fn = keras.losses.MeanAbsoluteError()
 
     def train_step(self, batch_data):
-        # x is Horse and y is zebra
         real_x, real_y = batch_data
 
         # For CycleGAN, we need to calculate different
@@ -146,6 +145,4 @@ class CycleGan(keras.Model):
         }
 
     def call(self, x):
-        prediction = self.gen_G(x)[0].numpy()
-        prediction = (prediction * 127.5 + 127.5).astype(np.uint8)
-        return prediction
+        return self.gen_G(x)[0]
