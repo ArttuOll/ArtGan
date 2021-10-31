@@ -9,8 +9,8 @@ from ReflectionPadding2D import ReflectionPadding2D
 from tensorflow.keras import layers
 from tensorflow import keras
 import tensorflow_addons as tfa
-
 from tensorflow.python.data.ops.dataset_ops import Dataset
+import matplotlib.pyplot as plt
 
 # Weights initializer for the layers.
 kernel_init = keras.initializers.RandomNormal(mean=0.0, stddev=0.02)
@@ -26,7 +26,7 @@ def main():
         art_dataset_validation,
         cityscape_dataset_training,
         cityscape_dataset_validation,
-    ) = _get_datasets()
+    ) = _get_datasets("./training_data")
 
     # Preprocess training data
     art_dataset_training = art_dataset_training.map(preprocess_train_image).cache().shuffle(
@@ -37,10 +37,10 @@ def main():
     ).batch(1)
 
     # Preprocess validation data
-    art_dataset_training = art_dataset_validation.map(normalize_pixel_values).cache().shuffle(
+    art_dataset_validation = art_dataset_validation.map(normalize_pixel_values).cache().shuffle(
         232
     ).batch(1)
-    cityscape_dataset_training = cityscape_dataset_validation.map(normalize_pixel_values).cache().shuffle(
+    cityscape_dataset_validation = cityscape_dataset_validation.map(normalize_pixel_values).cache().shuffle(
         232
     ).batch(1)
 
@@ -63,20 +63,37 @@ def main():
     )
 
     # Train the model
+
     model.fit(
         tf.data.Dataset.zip(
-            (art_dataset_training, cityscape_dataset_training)
+            (cityscape_dataset_training, art_dataset_training)
         ),
+        # callbacks=[plotter, model_checkpoint_callback],
+        batch_size=1,
         epochs=1,
-        callbacks=[plotter, model_checkpoint_callback],
     )
+
+    fig = plt.figure(figsize=(8, 8))
+    for i, img in enumerate(cityscape_dataset_training.take(5)):
+        original_image = img[0, :, :, :].numpy() * 0.5 + 0.5
+        art_image = model.predict(img) * 0.5 + 0.5
+
+        fig.add_subplot(5, 2, i*2 + 1)
+        plt.imshow(original_image)
+
+        fig.add_subplot(5, 2, i*2 + 2)
+        plt.imshow(art_image)
+
+    plt.show()
+
+    # Save the model
+    model.save("./trained_model")
 
 
 def load_dataset(path):
     images = list()
     for filename in listdir(path):
-
-        image = load_img(path + "/" + filename)
+        image = load_img(path + "/" + filename, target_size=(256, 256))
         array = tf.keras.preprocessing.image.img_to_array(image)
         images.append(array)
     return np.stack(images)
@@ -95,9 +112,9 @@ def _convert_to_dataset_object(dataset):
     return Dataset.from_tensor_slices(dataset)
 
 
-def _get_datasets():
-    art_dataset = load_dataset("./training_data/art")
-    cityscape_dataset = load_dataset("./training_data/cityscapes")
+def _get_datasets(path):
+    art_dataset = load_dataset(path + "/art")
+    cityscape_dataset = load_dataset(path + "/cityscapes")
 
     art_dataset_training, art_dataset_validation = _validation_split(
         art_dataset
@@ -147,6 +164,8 @@ def residual_block(
     padding="valid",
     gamma_initializer=gamma_init,
     use_bias=False,
+
+
 ):
     dim = x.shape[-1]
     input_tensor = x
@@ -278,8 +297,9 @@ def get_resnet_generator(
     model = keras.models.Model(img_input, x, name=name)
     return model
 
-
 # Build the discriminators
+
+
 def get_discriminator(
     filters=64, kernel_initializer=kernel_init, num_downsampling=3, name=None
 ):
@@ -327,7 +347,7 @@ def get_discriminator(
 
 # Train the end-to-end model
 # Loss function for evaluating adversarial loss
-adv_loss_fn = keras.losses.MeanSquaredError()
+adv_loss_fn = keras.losses.MeanSquaredLogarithmicError()
 
 
 # Define the loss function for the generators
