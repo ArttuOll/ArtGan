@@ -70,7 +70,6 @@ def main():
             (cityscape_dataset_training, art_dataset_training)
         ),
         # callbacks=[plotter, model_checkpoint_callback],
-        batch_size=1,
         epochs=1,
     )
 
@@ -365,6 +364,7 @@ def discriminator_loss_fn(real, fake):
 
 
 def build_model(gen_G, gen_F, disc_X, disc_Y):
+
     OUTPUT_CHANNELS = 3
     generator_g = pix2pix.unet_generator(
         OUTPUT_CHANNELS, norm_type='instancenorm')
@@ -377,10 +377,10 @@ def build_model(gen_G, gen_F, disc_X, disc_Y):
         norm_type='instancenorm', target=False)
 
     cycle_gan_model = CycleGan(
-        generator_G=generator_g,
-        generator_F=generator_f,
-        discriminator_X=discriminator_x,
-        discriminator_Y=discriminator_y,
+        generator_G=gen_G,
+        generator_F=gen_F,
+        discriminator_X=disc_X,
+        discriminator_Y=disc_Y,
     )
 
     # Compile the model
