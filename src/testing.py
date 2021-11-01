@@ -38,7 +38,3 @@ for i in range(5):
     plt.imshow(art)
 
 plt.show()
-
-
-#plt.imshow(model.predict(test_images[0:1, :, :, :]))
-# plt.show()
