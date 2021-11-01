@@ -25,7 +25,7 @@ def main():
         art_dataset_validation,
         cityscape_dataset_training,
         cityscape_dataset_validation,
-    ) = _get_datasets("./training_data2")
+    ) = get_datasets("./training_data")
 
     # Preprocess training data
     art_dataset_training = art_dataset_training.map(preprocess_train_image).cache().shuffle(
@@ -80,7 +80,7 @@ def load_dataset(path):
     return np.stack(images)
 
 
-def _validation_split(dataset):
+def validation_split(dataset):
     validation_split = math.floor(len(dataset) * 0.8)
 
     dataset_training = dataset[:validation_split]
@@ -89,29 +89,29 @@ def _validation_split(dataset):
     return dataset_training, dataset_validation
 
 
-def _convert_to_dataset_object(dataset):
+def convert_to_dataset_object(dataset):
     return Dataset.from_tensor_slices(dataset)
 
 
-def _get_datasets(path):
+def get_datasets(path):
     art_dataset = load_dataset(path + "/art")
     cityscape_dataset = load_dataset(path + "/cityscapes")
 
-    art_dataset_training, art_dataset_validation = _validation_split(
+    art_dataset_training, art_dataset_validation = validation_split(
         art_dataset
     )
 
     (
         cityscape_dataset_training,
         cityscape_dataset_validation,
-    ) = _validation_split(cityscape_dataset)
+    ) = validation_split(cityscape_dataset)
 
-    art_dataset_training = _convert_to_dataset_object(art_dataset_training)
-    cityscape_dataset_training = _convert_to_dataset_object(
+    art_dataset_training = convert_to_dataset_object(art_dataset_training)
+    cityscape_dataset_training = convert_to_dataset_object(
         cityscape_dataset_training
     )
-    art_dataset_validation = _convert_to_dataset_object(art_dataset_validation)
-    cityscape_dataset_validation = _convert_to_dataset_object(
+    art_dataset_validation = convert_to_dataset_object(art_dataset_validation)
+    cityscape_dataset_validation = convert_to_dataset_object(
         cityscape_dataset_validation
     )
 
