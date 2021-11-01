@@ -3,7 +3,6 @@ import tensorflow as tf
 import numpy as np
 
 
-# Build the CycleGAN model
 class CycleGan(keras.Model):
     def __init__(
         self,
@@ -60,14 +59,10 @@ class CycleGan(keras.Model):
         # 9. Return the losses in a dictionary
 
         with tf.GradientTape(persistent=True) as tape:
-            # Horse to fake zebra
             fake_y = self.gen_G(real_x, training=True)
-            # Zebra to fake horse -> y2x
             fake_x = self.gen_F(real_y, training=True)
 
-            # Cycle (Horse to fake zebra to fake horse): x -> y -> x
             cycled_x = self.gen_F(fake_y, training=True)
-            # Cycle (Zebra to fake horse to fake zebra) y -> x -> y
             cycled_y = self.gen_G(fake_x, training=True)
 
             # Identity mapping
