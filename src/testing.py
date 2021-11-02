@@ -6,6 +6,10 @@ from os import listdir
 from keras.preprocessing.image import load_img
 
 
+# This script reads images from `test_images` directory, then uses the trained model to
+# convert them to art styles and save them on the same directory, with `_art` added  to
+# the name.
+
 def normalize_pixel_values(img):
     img = tf.cast(img, dtype=tf.float32)
     return (img / 127.5) - 1.0
@@ -13,28 +17,23 @@ def normalize_pixel_values(img):
 
 def load_test_images(path):
     images = list()
-    for filename in listdir(path):
-        image = load_img(path + "/" + filename, target_size=(256, 256))
+    files_list = listdir(path)
+    for filename in files_list:
+        image = load_img(path + "/" + filename,
+                         target_size=(256, 256), interpolation='bilinear')
         array = tf.keras.preprocessing.image.img_to_array(image)
-        images.append(array)
-    return np.stack(images)
+        images.append((filename.split(".")[-2], array))
+    return images
 
 
 # directory that contains pictures from Joensuu/Kupio.
 test_images = load_test_images("./test_images")
-test_images = normalize_pixel_values(test_images)
-
 model = keras.models.load_model("./trained_model")
 
-fig = plt.figure(figsize=(8, 8))
-for i in range(5):
-    original = test_images[i, :, :, :]*0.5 + 0.5
-    art = model.predict(test_images[i:i+1, :, :, :])*0.5 + 0.5
-
-    fig.add_subplot(5, 2, i * 2 + 1)
-    plt.imshow(original)
-
-    fig.add_subplot(5, 2, i * 2 + 2)
-    plt.imshow(art)
-
-plt.show()
+for i, named_image in enumerate(test_images):
+    name, img = named_image
+    img = normalize_pixel_values(img)
+    art = model.predict(img[None, :, :, :])*0.5 + 0.5
+    plt.figure()
+    plt.imshow(art, interpolation='bilinear')
+    plt.savefig("./test_images/" + name + "_art.jpg")
